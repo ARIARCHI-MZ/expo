@@ -1,0 +1,104 @@
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Modal,
+  Text,
+  Image,
+  Alert,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+} from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as MediaLibrary from "expo-media-library";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import Toast from "react-native-root-toast";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export default AttachmentModal = ({
+  visible,
+  attachments,
+  onRequestClose,
+  odlId,
+  scope,
+  isOffline,
+  isCompleted, // New prop to indicate form completion
+}) => {
+  const [files, setFiles] = useState([]);
+  const [uploading, setUpLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(-1);
+
+
+  const downloadODLAttachments = async (file, index) => {
+    setLoading(true);
+    setCurrentIndex(index);
+
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    console.log("downloadODLAttachments status",status )
+    if (status != 'granted') {
+      Alert.alert('Download', `L'app richiede l'autorizzazione alla libreria multimediale per salvare il file su questo dispositivo.`);
+      return;
+    };
+
+    try {
+      let downloadedFile
+      if (Platform.OS === 'ios') {
+        const directoryPath = FileSystem.documentDirectory;
+    const newLocalFilePathIOS = `${directoryPath}${new Date().getTime()}${file.Name}`;
+    console.log('New Local File Path (iOS):', newLocalFilePathIOS);
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        file.Url,
+        newLocalFilePathIOS,
+        {},
+      );
+
+      downloadedFile = await downloadResumable.downloadAsync();
+      console.log('downloaded File (iOS):', downloadedFile);
+      } else {
+      const newLocalFilePath = `${FileSystem.documentDirectory}CompanyName/${new Date().getTime() + file.Name}`
+     
+      await FileSystem.makeDirectoryAsync(newLocalFilePath, { intermediates: true });
+
+     downloadedFile = await FileSystem.downloadAsync(file.Url, newLocalFilePath);
+      }
+      if (downloadedFile.status != 200) {
+        downloadErrorHandler('Download not completed!')}
+        if (Platform.OS === 'ios') {
+          console.log("downloadODLAttachments enter ios")
+          const UTI = 'public.item';
+          await Sharing.shareAsync(downloadedFile.uri, { UTI });
+        } else {
+          await saveAndroidFiles(downloadedFile.uri, file.Name, downloadedFile.headers['Content-Type']);
+        };
+        setLoading(false);
+        setCurrentIndex(-1);
+        Alert.alert('Download', `Il file ${file.Name} è stato scaricato correttamente.`);
+      
+    } catch (error) {
+      console.log(error);
+    };
+  };
+
+  const item =  {"ContentType": null, "Id": "24c*****44ec", "Name": "Core.File.zip", "Size": 2836701, "Type": 1, "Url": "http://********//*********?token=d44******8a6-3ad5a5*******44ec"}
+    return (
+      
+        <View style={styles.fileActionContianer}>
+          <Pressable
+            style={{ width: 24, height: 24, BackGroundColor: "green" }}
+            onPress={() => downloadODLAttachments(item, index)}
+            disabled={uploading || loading}
+          />
+      </View>
+ );
+};
+      const styles = StyleSheet.create({
+  fileActionContianer: {
+    alignItems: "center",
+  },
+    });
+  
